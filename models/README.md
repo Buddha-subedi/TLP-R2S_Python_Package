@@ -1,0 +1,1 @@
+Model artifacts are intentionally not committed here. For automatic package loading, put the five files in src/tlpr2s/model_data/ BEFORE building the wheel. Alternatively pass model_dir and cdf_dir pointing to this folder.
