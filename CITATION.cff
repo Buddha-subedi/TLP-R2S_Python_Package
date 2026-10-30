@@ -1,6 +1,0 @@
-cff-version: 1.2.0
-message: "If you use this software, please cite the associated TLP-R2S research publication."
-title: "tlpr2s: Passive Microwave Precipitation Retrieval"
-type: software
-version: 0.1.0
-# TODO: Add verified authors, repository URL, release DOI and publication citation before publishing.
