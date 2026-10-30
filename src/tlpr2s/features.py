@@ -1,4 +1,0 @@
-"""Exact order of 30 predictors used by the legacy TLP-R2S model."""
-FEATURES = ['19.35v','19.35h','22.235v','37v','37h','91.665v','91.665h','150h','183-1','183-3','183-7','tciw','tclw','tcwv','t2m','cape','u10','v10','skt','asn','rsn','cin','sd','tcslw','tcw','swvl1','lsm','siconc','Month','Day']
-FIELD_MAP = {'tciw':'ERA5_IWP','tclw':'ERA5_LWP','tcwv':'ERA5_WVP','t2m':'ERA5_t2m','cape':'ERA5_CAPE','u10':'ERA5_u10','v10':'ERA5_v10','skt':'ERA5_skt','asn':'ERA5_asn','rsn':'ERA5_rsn','cin':'ERA5_cin','sd':'ERA5_sd','tcslw':'ERA5_tcslw','tcw':'ERA5_tcw','swvl1':'ERA5_swvl1','lsm':'ERA5_lsm','siconc':'ERA5_siconc'}
-TB_FIELDS = {'19.35v':('TbS1',0),'19.35h':('TbS1',1),'22.235v':('TbS1',2),'37v':('TbS2',0),'37h':('TbS2',1),'150h':('TbS3',0),'183-1':('TbS3',1),'183-3':('TbS3',2),'183-7':('TbS3',3),'91.665v':('TbS4',0),'91.665h':('TbS4',1)}
