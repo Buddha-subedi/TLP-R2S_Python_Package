@@ -1,7 +1,6 @@
 # Full original SSMIS F16 DAAC-oriented NetCDF product
 
 The public Python function is `from tlpr2s import DAAC_compatible_nc`.
-Python identifiers cannot contain spaces; `from tlpr2s import DAAC_compatible nc` is invalid syntax.
 
 The code reuses the original `products.py` writer, not a simplified replacement.
 Its original groups, attributes, variable names, dimensions, compression and
@@ -13,6 +12,8 @@ S4 scan times are retained. Original output includes root `Latitude`,
 ## Example
 
 ```python
+%%% I think i should make it take all those variables that i give as input and
+%% save in DAAC compatible format instead of passing separate nc file
 from tlpr2s import DAAC_compatible_nc
 DAAC_compatible_nc(
     'TLP-R2S_V01_1C.F16.SSMIS.XCAL2021-V.20230101-S000000-E013000.000001.V07A.nc',
