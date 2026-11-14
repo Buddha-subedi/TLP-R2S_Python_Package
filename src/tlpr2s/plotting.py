@@ -4,16 +4,17 @@ TLP-R2S precipitation visualization.
 
 Features
 --------
-1. Combined rainfall and snowfall in one geographic subplot.
+1. Combined rainfall and snowfall using pcolormesh in one geographic subplot.
 2. Separate vertical rain and snow colorbars.
 3. Original precipitation colormaps and power scaling.
 4. Invalid latitude/longitude filtering.
 5. Longitude normalization to [-180, 180].
 6. Dominant precipitation phase visualization.
 7. Cartopy coastlines and country boundaries.
-8. Safe plotting across the international dateline.
-9. Annual statistics visualization.
-10. High-resolution PNG output.
+8. Mask discontinuous mesh cells across the international dateline.
+9. Light-gray background for the complete valid SSMIS swath.
+10. Annual statistics visualization.
+11. High-resolution PNG output.
 
 The functions preserve the original package API.
 """
@@ -137,15 +138,8 @@ def _prepare_swath(
         (lon[valid_geo] + 180.0) % 360.0
     ) - 180.0
 
-    # Exclude points extremely close to the dateline
-    # to avoid graphical discontinuities.
-    dateline = (
-        valid_geo
-        & (np.abs(lon) >= 179.5)
-    )
-
-    valid_geo &= ~dateline
-
+    # Keep valid dateline observations. Mesh discontinuities are
+    # handled separately rather than deleting an entire longitude band.
     lon[~valid_geo] = np.nan
     lat[~valid_geo] = np.nan
 
@@ -221,8 +215,66 @@ def _prepare_swath(
 
 
 # ============================================================
-# 3. COMBINED RAIN/SNOW ORBITAL MAP
+# 3. CONTINUOUS SWATH MESH HELPERS
 # ============================================================
+
+def _mesh_coordinates(lon, lat):
+    """Return finite coordinates and a mask for unsafe swath cells.
+
+    pcolormesh requires finite coordinate arrays even when its data is
+    masked. Invalid coordinates are filled solely for mesh construction;
+    their corresponding data cells remain masked.
+    """
+    from scipy.ndimage import distance_transform_edt
+
+    valid = np.isfinite(lon) & np.isfinite(lat)
+    if not np.any(valid):
+        raise ValueError("No valid swath geolocation")
+
+    # Fill invalid centers with their nearest valid coordinate.
+    if np.all(valid):
+        lon_safe = lon.copy()
+        lat_safe = lat.copy()
+    else:
+        indices = distance_transform_edt(~valid, return_distances=False,
+                                         return_indices=True)
+        lon_safe = lon[tuple(indices)].copy()
+        lat_safe = lat[tuple(indices)].copy()
+
+    # Suppress cells neighboring discontinuous coordinates. A 180-degree
+    # longitude jump is a dateline seam, not a genuine footprint width.
+    unsafe = ~valid.copy()
+    for axis in (0, 1):
+        lon_jump = np.abs(np.diff(lon_safe, axis=axis)) > 180.0
+        lat_jump = np.abs(np.diff(lat_safe, axis=axis)) > 20.0
+        jumps = lon_jump | lat_jump
+        if axis == 0:
+            unsafe[:-1, :] |= jumps
+            unsafe[1:, :] |= jumps
+        else:
+            unsafe[:, :-1] |= jumps
+            unsafe[:, 1:] |= jumps
+
+    return lon_safe, lat_safe, unsafe
+
+
+def _draw_swath_mesh(ax, lon, lat, values, *, cmap, vmin, vmax,
+                     zorder, gamma=POWER):
+    """Draw swath pixels as a continuous QuadMesh, not a scatter plot."""
+    import cartopy.crs as ccrs
+
+    if gamma is None:
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    else:
+        norm = mcolors.Normalize(vmin=vmin ** gamma, vmax=vmax ** gamma)
+        values = np.ma.power(values, gamma)
+
+    return ax.pcolormesh(
+        lon, lat, values, shading="nearest", cmap=cmap, norm=norm,
+        transform=ccrs.PlateCarree(), rasterized=True, zorder=zorder,
+        linewidth=0, antialiased=False,
+    )
+
 
 def save_combined_map(
     path,
@@ -310,64 +362,48 @@ def save_combined_map(
             )
 
             # ------------------------------------------------
-            # Snowfall layer
+            # Full swath background and precipitation QuadMeshes
             # ------------------------------------------------
+            mesh_lon, mesh_lat, unsafe = _mesh_coordinates(lon, lat)
+            valid_mesh = ~unsafe
+            print(f"Safe pcolormesh pixels: {np.count_nonzero(valid_mesh):,}",
+                  flush=True)
 
-            if np.any(snow_valid):
+            # Gray cells indicate valid satellite coverage, including
+            # locations with no retrieved precipitation.
+            swath_values = np.ma.array(
+                np.ones(lat.shape, dtype=np.float32), mask=unsafe
+            )
+            _draw_swath_mesh(
+                ax, mesh_lon, mesh_lat, swath_values,
+                cmap=mcolors.ListedColormap(["#DADADA"]),
+                vmin=0, vmax=1, zorder=1, gamma=None,
+            )
 
-                snow_plot = ax.scatter(
-                    lon[snow_valid],
-                    lat[snow_valid],
-                    c=np.power(
-                        snow[snow_valid],
-                        POWER,
-                    ),
-                    cmap=SNOW_CMAP,
-                    vmin=0,
-                    vmax=1.0 ** POWER,
-                    s=0.6,
-                    marker="s",
-                    linewidths=0,
-                    alpha=0.9,
-                    rasterized=True,
-                    transform=ccrs.PlateCarree(),
+            snow_values = np.ma.array(
+                snow, mask=unsafe | ~snow_valid
+            )
+            rain_values = np.ma.array(
+                rain, mask=unsafe | ~rain_valid
+            )
+
+            if np.any(snow_valid & valid_mesh):
+                _draw_swath_mesh(
+                    ax, mesh_lon, mesh_lat, snow_values,
+                    cmap=SNOW_CMAP, vmin=0, vmax=1.0,
                     zorder=2,
                 )
-
             else:
-                warnings.warn(
-                    "No valid snowfall pixels found."
-                )
+                warnings.warn("No valid snowfall pixels found.")
 
-            # ------------------------------------------------
-            # Rainfall layer
-            # ------------------------------------------------
-
-            if np.any(rain_valid):
-
-                rain_plot = ax.scatter(
-                    lon[rain_valid],
-                    lat[rain_valid],
-                    c=np.power(
-                        rain[rain_valid],
-                        POWER,
-                    ),
-                    cmap=RAIN_CMAP,
-                    vmin=0,
-                    vmax=6.0 ** POWER,
-                    s=0.6,
-                    marker="s",
-                    linewidths=0,
-                    alpha=0.9,
-                    rasterized=True,
-                    transform=ccrs.PlateCarree(),
+            if np.any(rain_valid & valid_mesh):
+                _draw_swath_mesh(
+                    ax, mesh_lon, mesh_lat, rain_values,
+                    cmap=RAIN_CMAP, vmin=0, vmax=6.0,
                     zorder=3,
                 )
-
             else:
-                warnings.warn(
-                    "No valid rainfall pixels found."
-                )
+                warnings.warn("No valid rainfall pixels found.")
 
             # ------------------------------------------------
             # Independent colorbar mappables
