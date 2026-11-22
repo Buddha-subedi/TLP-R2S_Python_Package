@@ -832,3 +832,184 @@ def plot_annual(
         plt.show()
 
     return fig, ax
+
+
+
+def plot_annual_comparison(
+    statistics,
+    era5_snow,
+    era5_rain,
+    *,
+    save=None,
+    show=False,
+    dpi=300,
+    snow_vmax=0.105,
+    rain_vmax=0.83,
+    tlpr2s_snow_north_factor=1.0,
+    tlpr2s_snow_south_factor=1.0,
+    tlpr2s_rain_factor=1.0,
+):
+    """Plot a 2x2 TLP-R2S vs ERA5 mean-rate comparison.
+
+    ERA5 inputs must be mean rates (mm/hr), aligned to the
+    AnnualStatistics latitude/longitude grid.
+    """
+    from pathlib import Path
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+    from matplotlib.colors import LinearSegmentedColormap
+    from matplotlib.ticker import FuncFormatter
+    import matplotlib.patches as mpatches
+    import cartopy.crs as ccrs
+    from .annual import AnnualStatistics
+
+    if isinstance(statistics, (str, Path)):
+        statistics = AnnualStatistics.load(statistics)
+
+    lat = np.asarray(statistics.latitude, dtype=float)
+    lon = np.asarray(statistics.longitude, dtype=float)
+    shape = (lat.size, lon.size)
+
+    era5_snow = np.asarray(era5_snow, dtype=float)
+    era5_rain = np.asarray(era5_rain, dtype=float)
+
+    if era5_snow.shape != shape or era5_rain.shape != shape:
+        raise ValueError(
+            f"ERA5 arrays must have shape {shape}; "
+            f"got {era5_snow.shape} and {era5_rain.shape}"
+        )
+
+    tl_snow = np.asarray(statistics.mean_snow, dtype=float).copy()
+    tl_rain = np.asarray(statistics.mean_rain, dtype=float).copy()
+
+    tl_snow *= np.where(
+        lat[:, None] >= 0,
+        tlpr2s_snow_north_factor,
+        tlpr2s_snow_south_factor,
+    )
+    tl_rain *= tlpr2s_rain_factor
+
+    cmap_snow = LinearSegmentedColormap.from_list(
+        "comparison_snow",
+        ["white", "cyan", "blue", "blueviolet"],
+        N=256,
+    )
+    cmap_rain = LinearSegmentedColormap.from_list(
+        "comparison_rain",
+        [
+            "white", "darkgreen", "green", "yellow",
+            "darkorange", "red", "magenta", "purple",
+        ],
+        N=256,
+    )
+
+    fig = plt.figure(figsize=(12, 4))
+    gs = GridSpec(
+        2, 2, figure=fig,
+        left=0.035, right=0.88,
+        bottom=0.06, top=0.91,
+        wspace=0.015, hspace=0.025,
+    )
+
+    panels = [
+        (tl_snow, cmap_snow, snow_vmax, "(a)"),
+        (era5_snow, cmap_snow, snow_vmax, "(b)"),
+        (tl_rain, cmap_rain, rain_vmax, "(c)"),
+        (era5_rain, cmap_rain, rain_vmax, "(d)"),
+    ]
+
+    meshes = []
+
+    for i, (values, cmap, vmax, panel) in enumerate(panels):
+        ax = fig.add_subplot(
+            gs[i // 2, i % 2],
+            projection=ccrs.PlateCarree(),
+        )
+
+        mesh = ax.pcolormesh(
+            lon, lat,
+            np.ma.masked_invalid(values),
+            vmin=0,
+            vmax=vmax,
+            cmap=cmap,
+            alpha=0.85,
+            transform=ccrs.PlateCarree(),
+            shading="auto",
+            rasterized=True,
+        )
+        meshes.append(mesh)
+
+        ax.coastlines(alpha=0.3, linewidth=0.5)
+        ax.set_extent(
+            [-179.9, 179.9, -90, 90],
+            crs=ccrs.PlateCarree(),
+        )
+
+        ax.text(
+            0.89, 0.05, panel,
+            transform=ax.transAxes,
+            fontsize=12,
+            fontweight="bold",
+            va="center",
+            ha="right",
+        )
+
+        if i < 2:
+            ax.set_title(
+                ["TLP-R2S", "ERA5"][i],
+                fontsize=12,
+                fontweight="bold",
+            )
+
+        ax.add_patch(
+            mpatches.FancyBboxPatch(
+                (0, 0), 1, 1,
+                transform=ax.transAxes,
+                boxstyle="round,pad=0.008",
+                edgecolor="black",
+                facecolor="none",
+                linewidth=1.2,
+            )
+        )
+
+        ax.gridlines(
+            draw_labels=False,
+            linestyle="--",
+            alpha=0.3,
+        )
+
+    formatter = FuncFormatter(lambda x, pos: f"{x:.2f}")
+
+    for mesh_index, rect, label in [
+        (0, [0.91, 0.55, 0.009, 0.28], "Snow (mm hr$^{-1}$)"),
+        (2, [0.91, 0.14, 0.009, 0.28], "Rain (mm hr$^{-1}$)"),
+    ]:
+        cax = fig.add_axes(rect)
+        cb = fig.colorbar(
+            meshes[mesh_index],
+            cax=cax,
+            format=formatter,
+        )
+        cb.set_label(
+            label,
+            fontsize=10,
+            fontweight="bold",
+            rotation=270,
+            labelpad=16,
+        )
+        cb.ax.tick_params(labelsize=9)
+
+        for tick in cb.ax.get_yticklabels():
+            tick.set_fontweight("bold")
+
+    if save is not None:
+        save = Path(save)
+        save.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    return fig
+
