@@ -89,7 +89,9 @@ class PrecipitationRetriever:
             target=f'cdf_{name}'
             missing=[k for k in FEATURES+[target] if k not in df]
             if missing:raise ValueError(f'{name} CDF file missing columns: {missing}')
-            df=df[df[target].notna()&(df[target]>0)&(df[target]<limit)]
+            lower_limit = 0.01 if name == 'snow' else 0.0
+
+            df = df[ df[target].notna() & (df[target] > lower_limit) & (df[target] < limit)]
             if df.empty:raise ValueError(f'No valid {name} calibration samples')
             y=model.predict(xgb.DMatrix(df[FEATURES]))
             self.maps[name]=(make_mapping(y,df[target].values),float(y.min()),float(y.max()))
