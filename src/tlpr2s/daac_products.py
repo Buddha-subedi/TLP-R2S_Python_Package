@@ -622,20 +622,26 @@ def netcdf(path, X, phase, rain, snow, source, source_ssmis=None, model_version=
         nc.date_modified = now
         nc.time_coverage_start = time_start
         nc.time_coverage_end = time_end
-        valid_lat = latitude_s4[np.isfinite(latitude_s4)]
-        valid_lon = longitude_s4[np.isfinite(longitude_s4)]
 
-        nc.geospatial_lat_min = float(np.min(valid_lat))
-        nc.geospatial_lat_max = float(np.max(valid_lat))
-        nc.geospatial_lon_min = float(np.min(valid_lon))
-        nc.geospatial_lon_max = float(np.max(valid_lon))
 
-        nc.geospatial_bounds = build_geospatial_bounds(
-            latitude_s4,
-            longitude_s4,
-            points_per_edge=20,
+        # Exclude NaN, infinity, fill values and invalid coordinates
+        valid_geo = (
+           np.isfinite(latitude_s4)
+           & np.isfinite(longitude_s4)
+           & (latitude_s4 >= -90.0)
+           & (latitude_s4 <= 90.0)
+           & (longitude_s4 >= -180.0)
+           & (longitude_s4 <= 360.0)
         )
-        nc.geospatial_bounds_crs = "EPSG:4326"
+         
+       if np.any(valid_geo):
+          nc.geospatial_lat_min = float(np.min(latitude_s4[valid_geo]))
+          nc.geospatial_lat_max = float(np.max(latitude_s4[valid_geo]))
+          nc.geospatial_lon_min = float(np.min(longitude_s4[valid_geo]))
+          nc.geospatial_lon_max = float(np.max(longitude_s4[valid_geo]))
+       else:
+          raise ValueError("No valid latitude/longitude coordinates found")
+
 
         nc.title = (
             "MEaSUREs Precipitation Phase and Rate from Passive Microwave Observations and Earth System Models using Transfer Learning, Version 1"
@@ -651,13 +657,10 @@ def netcdf(path, X, phase, rain, snow, source, source_ssmis=None, model_version=
         )
         nc.source = "TLP-R2S model v01"
         nc.input_ssmis_file = source_name
-        nc.source_mat_file = str(source)
-        nc.model_version = model_version
+
 
         nc.input_granule_number = str(orbit)
-        nc.orbit_number = str(orbit)
-        nc.orbit_start_time = time_start
-        nc.orbit_end_time = time_end
+
         nc.input_platform = "DMSP-F16"
         nc.input_instrument = "SSMIS"
         nc.input_calibration_version = "XCAL2021-V"
