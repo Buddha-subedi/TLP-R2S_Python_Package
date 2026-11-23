@@ -634,17 +634,17 @@ def netcdf(path, X, phase, rain, snow, source, source_ssmis=None, model_version=
            & (longitude_s4 <= 360.0)
         )
          
-       if np.any(valid_geo):
-          nc.geospatial_lat_min = float(np.min(latitude_s4[valid_geo]))
-          nc.geospatial_lat_max = float(np.max(latitude_s4[valid_geo]))
-          nc.geospatial_lon_min = float(np.min(longitude_s4[valid_geo]))
-          nc.geospatial_lon_max = float(np.max(longitude_s4[valid_geo]))
-       else:
-          raise ValueError("No valid latitude/longitude coordinates found")
+        if np.any(valid_geo):
+           nc.geospatial_lat_min = float(np.min(latitude_s4[valid_geo]))
+           nc.geospatial_lat_max = float(np.max(latitude_s4[valid_geo]))
+           nc.geospatial_lon_min = float(np.min(longitude_s4[valid_geo]))
+           nc.geospatial_lon_max = float(np.max(longitude_s4[valid_geo]))
+        else:
+           raise ValueError("No valid latitude/longitude coordinates found")
 
 
         nc.title = (
-            "MEaSUREs Precipitation Phase and Rate from Passive Microwave Observations and Earth System Models using Transfer Learning, Version 1"
+            "MEaSUREs Precipitation Phase and Rate from SSMIS Passive Microwave Observations and Earth System Models using Transfer Learning, Version 1"
         )
         nc.summary = (
             "NASA Making Earth System Data Records for Use in Research Environments (MEaSUREs) "
