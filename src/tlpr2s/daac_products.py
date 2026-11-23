@@ -133,31 +133,116 @@ ERA5_REFERENCE_UNITS = {
 
 
 
-# Metadata dictionaries may be populated from the original metadata reference.
-# Use descriptive fallbacks where metadata is not supplied.
-era5_long_name = {k:k for k in ERA5_MAT_FIELDS}
-era5_input_comments = {k:f"ERA5 {k} collocated to SSMIS S4" for k in ERA5_MAT_FIELDS}
-era5_standard_name = {}
-era5_r_long_name = {"msr":"ERA5 mean snowfall rate", "mtpr":"ERA5 mean total precipitation rate"}
-era5_r_standard_name = {"msr":"snowfall_flux", "mtpr":"precipitation_flux"}
-era5_r_comment = {k:f"ERA5 {k} collocated to SSMIS S4" for k in ERA5_REFERENCE_MAT_FIELDS}
+# ERA5 variable metadata copied from SSMIS_daac_data_preparation.html.
+era5_input_comments = {
+    'tciw': "Total Column Cloud Ice Water (TCIW) represents the vertically integrated mass of cloud ice particles per unit area through the entire atmospheric column. This variable represents the total amount of ice-phase water in clouds from the surface to the top of the atmosphere, serving as an indicator of cloud ice content that influences precipitation processes and radiative transfer. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
 
-def validate_preloaded_metadata() -> None:
-    """Confirm that the metadata dictionaries from the previous code cell exist."""
-    required_names = (
-        "era5_input_comments",
-        "era5_standard_name",
-        "era5_long_name",
-        "era5_r_comment",
-        "era5_r_long_name",
-        "era5_r_standard_name",
-    )
-    missing = [name for name in required_names if name not in globals()]
-    if missing:
-        raise NameError(
-            "Run the previous ERA5 metadata code before this conversion code. "
-            f"Missing variable(s): {', '.join(missing)}"
-        )
+    'tclw': "Total Column Cloud Liquid Water (TCLW) represents the vertically integrated mass of cloud liquid water droplets per unit area through the entire atmospheric column. This variable quantifies the total liquid-phase water content in clouds, which is essential for understanding cloud properties, precipitation potential, and atmospheric moisture distribution. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'tcwv': "Total Column vertically-integrated Water Vapour (TCWV) represents the total mass of water vapour per unit area in a vertical column extending from the surface to the top of the atmosphere. This variable represents the precipitable water content available in the atmosphere, serving as a key indicator of atmospheric moisture and precipitation potential. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    't2m': "2 Metre Temperature (T2M) represents air temperature at 2 metres above the surface, indicating near-surface atmospheric conditions. This fundamental meteorological variable influences precipitation type, evaporation rates, and atmospheric stability, making it crucial for precipitation analysis and modeling. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'cape': "Convective Available Potential Energy (CAPE) measures the amount of energy available for convection, indicating atmospheric instability. Higher CAPE values suggest greater potential for thunderstorm development and intense precipitation, making this variable essential for identifying convective precipitation events. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'u10': "10 Metre U Wind Component (U10) represents the eastward component of the 10 metre wind vector, indicating horizontal wind speed in the west-to-east direction. This variable contributes to moisture transport, convergence patterns, and atmospheric dynamics that influence precipitation distribution and intensity. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'v10': "10 Metre V Wind Component (V10) represents the northward component of the 10 metre wind vector, indicating horizontal wind speed in the south-to-north direction. Combined with U10, this variable provides complete horizontal wind information crucial for understanding moisture advection and precipitation patterns. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'skt': "Skin Temperature (SKT) represents the temperature of the Earth's surface interface, indicating the radiative temperature of the land or sea surface. This variable influences surface energy balance, evaporation rates, and boundary layer processes that affect precipitation formation and distribution. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'asn': "This parameter is a measure of the reflectivity of the snow-covered part of the grid box. It is the fraction of solar (shortwave) radiation reflected by snow across the solar spectrum. The ECMWF Integrated Forecasting System (IFS) represents snow as a single additional layer over the uppermost soil level. The snow may cover all or part of the grid box. This parameter changes with snow age and also depends on vegetation height. It has a range of values between 0 and 1. For low vegetation, it ranges between 0.52 for old snow and 0.88 for fresh snow. For high vegetation with snow underneath, it depends on vegetation type and has values between 0.27 and 0.38. This parameter is defined over the whole globe, even where there is no snow. Regions without snow can be masked out by only considering grid points where the snow depth (m of water equivalent) is greater than 0.0. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'rsn': "Snow Density (RSN) represents the mass of snow per unit volume, indicating the compactness and water content of the snowpack. This variable is essential for understanding snow water equivalent, snowmelt potential, and the hydrological impact of snow-related precipitation. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'cin': "Convective Inhibition (CIN) represents the amount of energy needed to overcome the negatively buoyant layer in the lower atmosphere before convection can occur. This variable acts as a cap on convection, with lower values indicating easier convective initiation and potential for convective precipitation. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'sd': "Snow Depth (SD) is the amount of snow from the snow-covered area of a grid box. Its units are metres of water equivalent, so it is the depth the water would have if the snow melted and was spread evenly over the whole grid box. The ECMWF Integrated Forecasting System (IFS) represents snow as a single additional layer over the uppermost soil level. The snow may cover all or part of the grid box. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'tcslw': "Total Column Supercooled Liquid Water (TCSLW) represents the vertically integrated mass of liquid water at temperatures below 0°C per unit area through the atmospheric column. This variable is crucial for understanding mixed-phase cloud processes, aircraft icing conditions, and precipitation formation through the Bergeron-Findeisen process. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'tcw': "Total Column Water (TCW) represents the total mass of water in all phases (vapour, liquid, and ice) per unit area in a vertical atmospheric column. This comprehensive moisture variable represents the total atmospheric water content available for precipitation processes and atmospheric water cycling. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'swvl1': "Volumetric Soil Water Layer 1 (SWVL1) represents the volumetric water content in the uppermost soil layer (0--7 cm depth), expressed as the volume of water per unit volume of soil. This variable indicates surface soil moisture conditions that influence evaporation, runoff, and the partitioning of precipitation. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'lsm': "This parameter is the proportion of land, as opposed to ocean or inland waters (lakes, reservoirs, rivers and coastal waters), in a grid box. This parameter has values ranging between zero and one and is dimensionless. In cycles of the ECMWF Integrated Forecasting System (IFS) from CY41R1 (introduced in May 2015) onwards, grid boxes where this parameter has a value above 0.5 can be comprised of a mixture of land and inland water but not ocean. Grid boxes with a value of 0.5 and below can only be comprised of a water surface. In the latter case, the lake cover is used to determine how much of the water surface is ocean or inland water. In cycles of the IFS before CY41R1, grid boxes where this parameter has a value above 0.5 can only be comprised of land and those grid boxes with a value of 0.5 and below can only be comprised of ocean. In these older model cycles, there is no differentiation between ocean and inland water. This parameter does not vary in time. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids.",
+
+    'siconc': "This parameter is the fraction of a grid box which is covered by sea ice. Sea ice can only occur in a grid box which includes ocean or inland water according to the land-sea mask and lake cover, at the resolution being used. This parameter can be known as sea-ice (area) fraction, sea-ice concentration and more generally as sea-ice cover. In ERA5, sea-ice cover is given by two external providers. Before 1979 the HadISST2 dataset is used. From 1979 to August 2007 the OSI SAF (409a) dataset is used and from September 2007 the OSI SAF oper dataset is used. Sea ice is frozen sea water which floats on the surface of the ocean. Sea ice does not include ice which forms on land such as glaciers, icebergs and ice-sheets. It also excludes ice shelves which are anchored on land, but protrude out over the surface of the ocean. These phenomena are not modelled by the IFS. Long-term monitoring of sea ice is important for understanding climate change. Sea ice also affects shipping routes through the polar regions. Spatially interpolated using nearest neighbor method and temporally interpolated using linear interpolation on SSMIS grids"
+}
+
+
+
+
+era5_standard_name = {
+    'tciw': "atmosphere_mass_content_of_cloud_ice",
+    'tclw': "atmosphere_mass_content_of_cloud_liquid_water",
+    'tcwv': "atmosphere_mass_content_of_water_vapor",
+    't2m': "air_temperature",
+    'cape': "atmosphere_convective_available_potential_energy",
+    'u10': "x_wind",
+    'v10': "y_wind",
+    'cin': "atmosphere_convective_inhibition",
+    'lsm': "land_area_fraction",
+    'siconc': "sea_ice_area_fraction",
+    'skt': "surface_skin_temperature"
+}
+
+
+era5_long_name = {
+    'tciw': "Total Column Cloud Ice Water",
+    
+    'tclw': "Total Column Cloud Liquid Water",
+
+    'tcwv': "Total Column vertically-integrated Water Vapor",
+
+    't2m': "2m Temperature",
+
+    'cape': "Convective Available Potential Energy",
+
+    'u10': "10m u-component of Wind",
+
+    'v10': "10m v-component of Wind",
+
+    'skt': "Skin Temperature",
+
+    'asn': "Snow Albedo",
+
+    'rsn': "Snow Density",
+
+    'cin': "Convective Inhibition",
+
+    'sd': "Snow Depth",
+    
+    'tcslw': "Total Column Supercooled Liquid Water",
+
+    'tcw': "Total Column Water",
+
+    'swvl1': "Volumetric Soil Water Layer 1",
+
+    'lsm': "Land-Sea Mask",
+
+    'siconc': "Sea Ice Area Fraction"
+}
+
+
+
+
+##################
+
+era5_r_comment = {
+    'msr': "This parameter is the rate of snowfall at the Earth's surface. It is the sum of large-scale and convective snowfall. Large-scale snowfall is generated by the cloud scheme in the ECMWF Integrated Forecasting System (IFS). The cloud scheme represents the formation and dissipation of clouds and large-scale precipitation due to changes in atmospheric quantities (such as pressure, temperature and moisture) predicted directly at spatial scales of the grid box or larger. Convective snowfall is generated by the convection scheme in the IFS, which represents convection at spatial scales smaller than the grid box. In the IFS, precipitation is comprised of rain and snow. This parameter is a mean over a particular time period (the processing period) which depends on the data extracted. For the reanalysis, the processing period is over the 1 hour ending at the validity date and time. For the ensemble members, ensemble mean and ensemble spread, the processing period is over the 3 hours ending at the validity date and time. It is the rate the snowfall would have if it were spread evenly over the grid box. 1 kg of water spread over 1 square metre of surface is 1 mm deep (neglecting the effects of temperature on the density of water), therefore the units are equivalent to mm (of liquid water) per second. Care should be taken when comparing model parameters with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box.",
+    'mtpr': "This parameter is the rate of precipitation at the Earth's surface. It is the sum of the rates due to large-scale precipitation and convective precipitation. Large-scale precipitation is generated by the cloud scheme in the ECMWF Integrated Forecasting System (IFS). The cloud scheme represents the formation and dissipation of clouds and large-scale precipitation due to changes in atmospheric quantities (such as pressure, temperature and moisture) predicted directly at spatial scales of the grid box or larger. Convective precipitation is generated by the convection scheme in the IFS, which represents convection at spatial scales smaller than the grid box. In the IFS, precipitation is comprised of rain and snow. This parameter is a mean over a particular time period (the processing period) which depends on the data extracted. For the reanalysis, the processing period is over the 1 hour ending at the validity date and time. For the ensemble members, ensemble mean and ensemble spread, the processing period is over the 3 hours ending at the validity date and time. It is the rate the precipitation would have if it were spread evenly over the grid box. 1 kg of water spread over 1 square metre of surface is 1 mm deep (neglecting the effects of temperature on the density of water), therefore the units are equivalent to mm (of liquid water) per second. Care should be taken when comparing model parameters with observations, because observations are often local to a particular point in space and time, rather than representing averages over a model grid box.",
+}
+
+era5_r_long_name = {
+    'msr': "Mean Snow Rate",
+    'mtpr': "Mean Total Precipitation Rate",
+}
+
+era5_r_standard_name = {
+    'msr': "snowfall_flux",
+    'mtpr': "precipitation_flux",
+}
 
 
 # =============================================================================
