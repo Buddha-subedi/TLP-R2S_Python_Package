@@ -756,48 +756,45 @@ def plot_orbit(
             # Full swath background and precipitation QuadMeshes
             # ------------------------------------------------
             mesh_lon, mesh_lat, unsafe = _mesh_coordinates(lon, lat)
-            polar = np.isfinite(lon) & np.isfinite(lat) & (lat <= -80.0)
-            mesh_mask = unsafe | polar
-            valid_mesh = ~mesh_mask
-            scatter_size = 0.5  # marker area in points squared
+            valid_mesh = ~unsafe
+            print(f"Safe pcolormesh pixels: {np.count_nonzero(valid_mesh):,}",
+                  flush=True)
 
-            scatter_kwargs = dict(
-                s=scatter_size, marker="s", linewidths=0,
-                edgecolors="none", transform=ccrs.PlateCarree(),
-                rasterized=True,
+            # Gray cells indicate valid satellite coverage, including
+            # locations with no retrieved precipitation.
+            swath_values = np.ma.array(
+                np.ones(lat.shape, dtype=np.float32), mask=unsafe
+            )
+            _draw_swath_mesh(
+                ax, mesh_lon, mesh_lat, swath_values,
+                cmap=mcolors.ListedColormap(["#DADADA"]),
+                vmin=0, vmax=1, zorder=1, gamma=None,
             )
 
-            if np.any(valid_mesh):
-                _draw_swath_mesh(
-                    ax, mesh_lon, mesh_lat,
-                    np.ma.array(np.ones(lat.shape, dtype=np.float32), mask=mesh_mask),
-                    cmap=mcolors.ListedColormap(["#DADADA"]),
-                    vmin=0, vmax=1, zorder=1, gamma=None,
-                )
-            if np.any(polar):
-                ax.scatter(lon[polar], lat[polar], c="#DADADA",
-                           zorder=1, **scatter_kwargs)
+            snow_values = np.ma.array(
+                snow, mask=unsafe | ~snow_valid
+            )
+            rain_values = np.ma.array(
+                rain, mask=unsafe | ~rain_valid
+            )
 
-            for values, valid, cmap, vmax, zorder, phase in (
-                (snow, snow_valid, SNOW_CMAP, 1.0, 2, "snowfall"),
-                (rain, rain_valid, RAIN_CMAP, 6.0, 3, "rainfall"),
-            ):
-                if np.any(valid & valid_mesh):
-                    _draw_swath_mesh(
-                        ax, mesh_lon, mesh_lat,
-                        np.ma.array(values, mask=mesh_mask | ~valid),
-                        cmap=cmap, vmin=0, vmax=vmax, zorder=zorder,
-                    )
-                selected = polar & valid
-                if np.any(selected):
-                    ax.scatter(
-                        lon[selected], lat[selected],
-                        c=values[selected] ** POWER, cmap=cmap,
-                        norm=mcolors.Normalize(vmin=0, vmax=vmax ** POWER),
-                        zorder=zorder, **scatter_kwargs,
-                    )
-                if not np.any(valid & (valid_mesh | polar)):
-                    warnings.warn(f"No valid {phase} pixels found.")
+            if np.any(snow_valid & valid_mesh):
+                _draw_swath_mesh(
+                    ax, mesh_lon, mesh_lat, snow_values,
+                    cmap=SNOW_CMAP, vmin=0, vmax=1.0,
+                    zorder=2,
+                )
+            else:
+                warnings.warn("No valid snowfall pixels found.")
+
+            if np.any(rain_valid & valid_mesh):
+                _draw_swath_mesh(
+                    ax, mesh_lon, mesh_lat, rain_values,
+                    cmap=RAIN_CMAP, vmin=0, vmax=6.0,
+                    zorder=3,
+                )
+            else:
+                warnings.warn("No valid rainfall pixels found.")
 
             # ------------------------------------------------
             # Independent colorbar mappables
