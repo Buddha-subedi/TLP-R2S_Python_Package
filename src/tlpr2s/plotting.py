@@ -678,15 +678,345 @@ def plot_orbit(
             "save= is required for the reference map writer"
         )
 
-    save_combined_map(
-        save,
+    path = save
+    import cartopy.crs as ccrs
+
+    path = Path(path)
+
+    path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    # --------------------------------------------------------
+    # Prepare swath
+    # --------------------------------------------------------
+
+    (
+        lon,
+        lat,
+        rain,
+        snow,
+        rain_valid,
+        snow_valid,
+    ) = _prepare_swath(
         longitude,
         latitude,
         rain,
         snow,
-        title,
-        dpi=dpi,
     )
+
+    # --------------------------------------------------------
+    # Figure settings
+    # --------------------------------------------------------
+
+    with mpl.rc_context(
+        {
+            "text.usetex": False,
+            "font.family": "serif",
+            "font.size": 12,
+            "axes.linewidth": 1.5,
+            "axes.edgecolor": "black",
+        }
+    ):
+
+        fig = plt.figure(
+            figsize=(14, 8)
+        )
+
+        try:
+
+            ax = fig.add_axes(
+                [0.07, 0.12, 0.79, 0.78],
+                projection=ccrs.PlateCarree(
+                    central_longitude=0
+                ),
+            )
+
+            # ------------------------------------------------
+            # Geographic extent
+            # ------------------------------------------------
+
+            ax.set_global()
+
+            ax.set_extent(
+                [-180, 180, -90, 90],
+                crs=ccrs.PlateCarree(),
+            )
+
+            # ------------------------------------------------
+            # Full swath background and precipitation QuadMeshes
+            # ------------------------------------------------
+            mesh_lon, mesh_lat, unsafe = _mesh_coordinates(lon, lat)
+            polar = np.isfinite(lon) & np.isfinite(lat) & (lat <= -80.0)
+            mesh_mask = unsafe | polar
+            valid_mesh = ~mesh_mask
+            scatter_size = 0.5  # marker area in points squared
+
+            scatter_kwargs = dict(
+                s=scatter_size, marker="s", linewidths=0,
+                edgecolors="none", transform=ccrs.PlateCarree(),
+                rasterized=True,
+            )
+
+            if np.any(valid_mesh):
+                _draw_swath_mesh(
+                    ax, mesh_lon, mesh_lat,
+                    np.ma.array(np.ones(lat.shape, dtype=np.float32), mask=mesh_mask),
+                    cmap=mcolors.ListedColormap(["#DADADA"]),
+                    vmin=0, vmax=1, zorder=1, gamma=None,
+                )
+            if np.any(polar):
+                ax.scatter(lon[polar], lat[polar], c="#DADADA",
+                           zorder=1, **scatter_kwargs)
+
+            for values, valid, cmap, vmax, zorder, phase in (
+                (snow, snow_valid, SNOW_CMAP, 1.0, 2, "snowfall"),
+                (rain, rain_valid, RAIN_CMAP, 6.0, 3, "rainfall"),
+            ):
+                if np.any(valid & valid_mesh):
+                    _draw_swath_mesh(
+                        ax, mesh_lon, mesh_lat,
+                        np.ma.array(values, mask=mesh_mask | ~valid),
+                        cmap=cmap, vmin=0, vmax=vmax, zorder=zorder,
+                    )
+                selected = polar & valid
+                if np.any(selected):
+                    ax.scatter(
+                        lon[selected], lat[selected],
+                        c=values[selected] ** POWER, cmap=cmap,
+                        norm=mcolors.Normalize(vmin=0, vmax=vmax ** POWER),
+                        zorder=zorder, **scatter_kwargs,
+                    )
+                if not np.any(valid & (valid_mesh | polar)):
+                    warnings.warn(f"No valid {phase} pixels found.")
+
+            # ------------------------------------------------
+            # Independent colorbar mappables
+            # ------------------------------------------------
+
+            # These ensure both colorbars are available
+            # even if one precipitation type is absent.
+
+            snow_sm = mpl.cm.ScalarMappable(
+                norm=mcolors.Normalize(
+                    vmin=0,
+                    vmax=1.0 ** POWER,
+                ),
+                cmap=SNOW_CMAP,
+            )
+
+            snow_sm.set_array([])
+
+            rain_sm = mpl.cm.ScalarMappable(
+                norm=mcolors.Normalize(
+                    vmin=0,
+                    vmax=6.0 ** POWER,
+                ),
+                cmap=RAIN_CMAP,
+            )
+
+            rain_sm.set_array([])
+
+            # ------------------------------------------------
+            # Coastlines and country borders
+            # ------------------------------------------------
+
+            try:
+
+                import cartopy.io.shapereader as shpreader
+
+                coast = shpreader.natural_earth(
+                    resolution="110m",
+                    category="physical",
+                    name="coastline",
+                )
+
+                border = shpreader.natural_earth(
+                    resolution="110m",
+                    category="cultural",
+                    name="admin_0_boundary_lines_land",
+                )
+
+                ax.add_geometries(
+                    shpreader.Reader(coast).geometries(),
+                    ccrs.PlateCarree(),
+                    edgecolor="#404040",
+                    facecolor="none",
+                    linewidth=0.4,
+                    zorder=5,
+                )
+
+                ax.add_geometries(
+                    shpreader.Reader(border).geometries(),
+                    ccrs.PlateCarree(),
+                    edgecolor="#606060",
+                    facecolor="none",
+                    linewidth=0.3,
+                    linestyle=":",
+                    zorder=5,
+                )
+
+            except Exception as exc:
+
+                warnings.warn(
+                    "Natural Earth coastline/border "
+                    f"unavailable: {exc}. "
+                    "Map saved without these features."
+                )
+
+            # ------------------------------------------------
+            # Gridlines
+            # ------------------------------------------------
+
+            gl = ax.gridlines(
+                draw_labels=True,
+                xlocs=np.arange(-180, 181, 60),
+                ylocs=np.arange(-90, 91, 20),
+                color="gray",
+                alpha=0.3,
+                linestyle="--",
+                linewidth=0.8,
+            )
+
+            gl.top_labels = False
+            gl.right_labels = False
+
+            gl.xlabel_style = {
+                "size": 12,
+                "weight": "bold",
+                "color": "#404040",
+            }
+
+            gl.ylabel_style = {
+                "size": 12,
+                "weight": "bold",
+                "color": "#404040",
+            }
+
+            # ------------------------------------------------
+            # Title and frame
+            # ------------------------------------------------
+
+            ax.set_title(
+                title,
+                fontsize=18,
+                fontweight="bold",
+                pad=10,
+                color="#202020",
+            )
+
+            for spine in ax.spines.values():
+                spine.set_visible(True)
+                spine.set_linewidth(1.5)
+                spine.set_edgecolor("#404040")
+
+            # ------------------------------------------------
+            # Two original vertical colorbars
+            # ------------------------------------------------
+
+            cax_snow = fig.add_axes(
+                [0.86, 0.55, 0.01, 0.30]
+            )
+
+            cax_rain = fig.add_axes(
+                [0.86, 0.20, 0.01, 0.30]
+            )
+
+            # Snow colorbar
+            cb_snow = fig.colorbar(
+                snow_sm,
+                cax=cax_snow,
+            )
+
+            cb_snow.set_label(
+                "Snow Rate (mm hr⁻¹)",
+                fontsize=12,
+                fontweight="bold",
+                color="#202020",
+                labelpad=10,
+            )
+
+            cb_snow.set_ticks(
+                [v ** POWER for v in SNOW_TICKS]
+            )
+
+            cb_snow.ax.set_yticklabels(
+                [f"{v:.2f}" for v in SNOW_TICKS],
+                fontweight="bold",
+            )
+
+            # Rain colorbar
+            cb_rain = fig.colorbar(
+                rain_sm,
+                cax=cax_rain,
+            )
+
+            cb_rain.set_label(
+                "Rain Rate (mm hr⁻¹)",
+                fontsize=12,
+                fontweight="bold",
+                color="#202020",
+                labelpad=10,
+            )
+
+            cb_rain.set_ticks(
+                [v ** POWER for v in RAIN_TICKS]
+            )
+
+            cb_rain.ax.set_yticklabels(
+                [f"{v:.1f}" for v in RAIN_TICKS],
+                fontweight="bold",
+            )
+
+            # Colorbar borders and ticks
+            for cb in (cb_snow, cb_rain):
+
+                cb.ax.tick_params(
+                    labelsize=10,
+                    width=1.5,
+                    length=5,
+                    colors="#404040",
+                )
+
+                for spine in cb.ax.spines.values():
+                    spine.set_linewidth(1.5)
+                    spine.set_edgecolor("#404040")
+
+            # ------------------------------------------------
+            # Save atomically
+            # ------------------------------------------------
+
+            tmp = path.with_name(
+                "." + path.stem + ".partial.png"
+            )
+
+            try:
+
+                fig.savefig(
+                    tmp,
+                    dpi=dpi,
+                    bbox_inches="tight",
+                    facecolor="white",
+                )
+
+                os.replace(
+                    tmp,
+                    path,
+                )
+
+            finally:
+
+                if tmp.exists():
+                    tmp.unlink()
+
+            print(
+                f"Saved orbital precipitation map: {path}",
+                flush=True,
+            )
+
+        finally:
+            plt.close(fig)
 
     return Path(save)
 
