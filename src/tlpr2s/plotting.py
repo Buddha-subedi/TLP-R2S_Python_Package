@@ -680,8 +680,16 @@ def plot_orbit(
 
     path = save
     import cartopy.crs as ccrs
+    import re
 
     path = Path(path)
+
+    # Automatically extract six-digit orbit number
+    # from the output filename.
+    match = re.search(r"_(\d{6})$", path.stem)
+
+    if match and title == "TLP-R2S Precipitation Rate":
+        title = f"Orbit: #{match.group(1)}"
 
     path.parent.mkdir(
         parents=True,
