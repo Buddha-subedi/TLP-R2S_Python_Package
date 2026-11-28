@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: If you use this software in your research, please cite this software package
   and the original TLP-R2S research article.
 title: 'tlpr2s: A Python Package for Passive Microwave Rainfall and Snowfall Retrievals
-  Using Incremental Learning'
+  Using Transfer Learning of Precipitation from Reanalysis data to Satellite observations (TLP-R2S)'
 type: software
 authors:
 - given-names: Buddha
